@@ -4,12 +4,6 @@ import numpy as np
 from datetime import datetime
 import io
 import requests
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Canoga AI Pro", layout="wide", initial_sidebar_state="expanded")
@@ -74,127 +68,6 @@ if "vd_result" not in st.session_state:
     st.session_state["vd_result"] = None
 if "vision_items" not in st.session_state:
     st.session_state["vision_items"] = []
-
-# --- CORE UTILITY FUNCTIONS ---
-def generate_bid_pdf(job_title, labor, materials_cost, permit_fees, markup, contractor_name, email, branch):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=letter,
-        rightMargin=0.75*inch, leftMargin=0.75*inch,
-        topMargin=0.75*inch, bottomMargin=0.75*inch
-    )
-    styles = getSampleStyleSheet()
-
-    header_style = ParagraphStyle("Header", parent=styles["Normal"],
-        fontSize=22, fontName="Helvetica-Bold",
-        textColor=colors.HexColor("#f59e0b"), spaceAfter=2)
-    sub_style = ParagraphStyle("Sub", parent=styles["Normal"],
-        fontSize=10, textColor=colors.HexColor("#64748b"), spaceAfter=2)
-    label_style = ParagraphStyle("Label", parent=styles["Normal"],
-        fontSize=9, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569"))
-    value_style = ParagraphStyle("Value", parent=styles["Normal"],
-        fontSize=10, textColor=colors.HexColor("#1e293b"))
-    section_style = ParagraphStyle("Section", parent=styles["Normal"],
-        fontSize=12, fontName="Helvetica-Bold", textColor=colors.HexColor("#1e3a5f"),
-        spaceBefore=14, spaceAfter=6)
-    total_style = ParagraphStyle("Total", parent=styles["Normal"],
-        fontSize=15, fontName="Helvetica-Bold",
-        textColor=colors.HexColor("#1e3a5f"), alignment=TA_RIGHT)
-    footer_style = ParagraphStyle("Footer", parent=styles["Normal"],
-        fontSize=8, textColor=colors.HexColor("#94a3b8"), alignment=TA_CENTER)
-
-    story = []
-
-    story.append(Paragraph("Canoga Electric Supply", header_style))
-    story.append(Paragraph("AI Pro Bid Proposal  |  Southern California Electrical Contractors", sub_style))
-    story.append(HRFlowable(width="100%", thickness=2.5, color=colors.HexColor("#f59e0b"), spaceAfter=14))
-
-    info_data = [
-        [Paragraph("<b>Prepared By:</b>", label_style), Paragraph(contractor_name, value_style),
-         Paragraph("<b>Date:</b>", label_style), Paragraph(datetime.now().strftime("%B %d, %Y"), value_style)],
-        [Paragraph("<b>Email:</b>", label_style), Paragraph(email, value_style),
-         Paragraph("<b>Branch:</b>", label_style), Paragraph(branch, value_style)],
-        [Paragraph("<b>Project:</b>", label_style), Paragraph(job_title, value_style), "", ""],
-    ]
-    info_table = Table(info_data, colWidths=[1.1*inch, 2.4*inch, 1.1*inch, 2.4*inch])
-    info_table.setStyle(TableStyle([
-        ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.HexColor("#f1f5f9"), colors.HexColor("#f8fafc")]),
-        ("GRID", (0,0), (-1,-1), 0.25, colors.HexColor("#e2e8f0")),
-        ("LEFTPADDING", (0,0), (-1,-1), 8),
-        ("RIGHTPADDING", (0,0), (-1,-1), 8),
-    ]))
-    story.append(info_table)
-
-    story.append(Paragraph("Project Cost Breakdown", section_style))
-
-    total_cost = labor + materials_cost + permit_fees
-    final_bid = total_cost * (1 + markup / 100)
-    net_profit = final_bid - total_cost
-
-    cost_data = [
-        ["Description", "Amount"],
-        ["Labor (Estimated Hours and Costs)", "$" + f"{labor:,.2f}"],
-        ["Canoga Electric Material Order",    "$" + f"{materials_cost:,.2f}"],
-        ["LADBS Plan Check / Permit Fees",    "$" + f"{permit_fees:,.2f}"],
-        ["Subtotal (Pre-Markup)",             "$" + f"{total_cost:,.2f}"],
-        ["Profit Margin Applied (" + str(markup) + "%)", "$" + f"{net_profit:,.2f}"],
-    ]
-    cost_table = Table(cost_data, colWidths=[4.5*inch, 2.5*inch])
-    cost_table.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1e3a5f")),
-        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ("FONTSIZE", (0,0), (-1,0), 11),
-        ("ALIGN", (1,0), (1,-1), "RIGHT"),
-        ("FONTNAME", (0,1), (-1,-1), "Helvetica"),
-        ("FONTSIZE", (0,1), (-1,-1), 10),
-        ("ROWBACKGROUNDS", (0,1), (-1,-2), [colors.white, colors.HexColor("#f8fafc")]),
-        ("BACKGROUND", (0,-1), (-1,-1), colors.HexColor("#fef3c7")),
-        ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-        ("LEFTPADDING", (0,0), (-1,-1), 10),
-        ("RIGHTPADDING", (0,0), (-1,-1), 10),
-        ("TOPPADDING", (0,0), (-1,-1), 7),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
-    ]))
-    story.append(cost_table)
-    story.append(Spacer(1, 10))
-
-    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#f59e0b"), spaceAfter=8))
-    story.append(Paragraph("TOTAL PROPOSED BID:   $" + f"{final_bid:,.2f}", total_style))
-    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#f59e0b"), spaceBefore=8, spaceAfter=20))
-
-    story.append(Paragraph("Authorization and Acceptance", section_style))
-    sig_data = [
-        ["Contractor Signature:", "_" * 35, "Date:", "_" * 20],
-        ["Client / GC Signature:", "_" * 35, "Date:", "_" * 20],
-        ["Print Name:",           "_" * 35, "PO / Job #:", "_" * 20],
-    ]
-    sig_table = Table(sig_data, colWidths=[1.5*inch, 2.9*inch, 0.8*inch, 1.8*inch])
-    sig_table.setStyle(TableStyle([
-        ("FONTNAME", (0,0), (-1,-1), "Helvetica"),
-        ("FONTSIZE", (0,0), (-1,-1), 9),
-        ("TEXTCOLOR", (0,0), (0,-1), colors.HexColor("#475569")),
-        ("TEXTCOLOR", (2,0), (2,-1), colors.HexColor("#475569")),
-        ("TOPPADDING", (0,0), (-1,-1), 10),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
-    ]))
-    story.append(sig_table)
-
-    story.append(Spacer(1, 24))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceAfter=6))
-    story.append(Paragraph(
-        "Generated by Canoga AI Pro on " + datetime.now().strftime("%B %d, %Y at %I:%M %p") +
-        "  |  Estimate valid for 30 days  |  Pricing subject to material availability  |  Branch: " + branch,
-        footer_style
-    ))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
 
 LADBS_PERMIT_SCOPES = [
     "All Electrical",
@@ -352,7 +225,6 @@ with tabs[0]:
     with col1:
         st.markdown("""
         **New in This Version**
-        - PDF Bid Export with signature block
         - Live LADBS Permit Feed by ZIP
         - Cross-tab session state for VD results
         - Conduit fill auto-suggests next size up
@@ -363,7 +235,7 @@ with tabs[0]:
         - Blueprint AI Takeoff (Grok Vision)
         - NEC Voltage Drop Engine (3% rule)
         - Conduit Fill Calculator (40% rule)
-        - Project Estimator with CSV and PDF export
+        - Project Estimator with CSV export
         - Material Will-Call Reservation
         """)
 
@@ -442,7 +314,7 @@ with tabs[2]:
 # --- TAB 3: BID ESTIMATOR & EXPORTER ---
 with tabs[3]:
     st.subheader("Project Estimator and Exporter")
-    st.write("Build your bid then export a client-ready PDF proposal or CSV.")
+    st.write("Build your bid then export a client-ready field estimate sheet.")
     col1, col2 = st.columns(2)
     with col1:
         job_title      = st.text_input("Project Title", "Reseda 12-Unit Rough-In")
@@ -463,52 +335,25 @@ with tabs[3]:
     m3.metric("Final Bid",      "$" + f"{final_bid:,.2f}")
     st.markdown("---")
 
-    ec1, ec2 = st.columns(2)
-    with ec1:
-        bid_dict = {
-            "Project Title":    job_title,
-            "Date Generated":   datetime.now().strftime("%Y-%m-%d"),
-            "Labor ($)":        labor,
-            "Materials ($)":    materials_cost,
-            "Permit Fees ($)":  permit_fees,
-            "Markup (%)":       markup,
-            "Net Profit ($)":   round(net_profit, 2),
-            "Total Bid ($)":    round(final_bid, 2),
-        }
-        csv_buf = io.StringIO()
-        pd.DataFrame([bid_dict]).to_csv(csv_buf, index=False)
-        st.download_button(
-            label="Export CSV",
-            data=csv_buf.getvalue(),
-            file_name="Canoga_Estimate_" + job_title.replace(" ", "_") + ".csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with ec2:
-        if st.button("Generate PDF Bid Proposal", use_container_width=True):
-            with st.spinner("Building branded PDF..."):
-                pdf_bytes = generate_bid_pdf(
-                    job_title, labor, materials_cost, permit_fees, markup,
-                    name, email, branch
-                )
-            st.download_button(
-                label="Download PDF Proposal",
-                data=pdf_bytes,
-                file_name="Canoga_Bid_" + job_title.replace(" ", "_") + ".pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
-            st.success("PDF ready - includes cost breakdown, total bid, and signature block.")
-
-    with st.expander("What is included in the PDF?"):
-        st.markdown("""
-        - Canoga Electric Supply branded header
-        - Contractor name, email, branch, date, project title
-        - Itemized cost table with labor, materials, permits, markup
-        - Final bid total prominently displayed
-        - Client and GC signature block with date and PO number fields
-        - Footer with 30-day validity and branch info
-        """)
+    bid_dict = {
+        "Project Title":    job_title,
+        "Date Generated":   datetime.now().strftime("%Y-%m-%d"),
+        "Labor ($)":        labor,
+        "Materials ($)":    materials_cost,
+        "Permit Fees ($)":  permit_fees,
+        "Markup (%)":       markup,
+        "Net Profit ($)":   round(net_profit, 2),
+        "Total Bid ($)":    round(final_bid, 2),
+    }
+    csv_buf = io.StringIO()
+    pd.DataFrame([bid_dict]).to_csv(csv_buf, index=False)
+    st.download_button(
+        label="Export Estimate CSV Summary",
+        data=csv_buf.getvalue(),
+        file_name="Canoga_Estimate_" + job_title.replace(" ", "_") + ".csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
 
 # --- TAB 4: WILL-CALL RESERVATION ---
 with tabs[4]:
@@ -633,4 +478,4 @@ with tabs[6]:
 
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Canoga AI Pro v3.0 - PDF Bid Export + Live LADBS Feed - Built for Southern California Electrical Contractors.")
+st.caption("Canoga AI Pro v3.0 - Live LADBS Feed - Built for Southern California Electrical Contractors.")
